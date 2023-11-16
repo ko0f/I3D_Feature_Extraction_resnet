@@ -82,12 +82,12 @@ def run(i3d, frequency, frames_dir, batch_size, sample_mode):
 	for batch_id in range(batch_num): 
 		batch_data = load_rgb_batch(frames_dir, rgb_files, frame_indices[batch_id])
 		if(sample_mode == 'oversample'):
-		   batch_data_ten_crop = oversample_data(batch_data)
-		   for i in range(10):
-			   assert(batch_data_ten_crop[i].shape[-2]==224)
-			   assert(batch_data_ten_crop[i].shape[-3]==224)
-			   temp = forward_batch(batch_data_ten_crop[i])
-			   full_features[i].append(temp)
+			batch_data_ten_crop = oversample_data(batch_data)
+			for i in range(10):
+				assert(batch_data_ten_crop[i].shape[-2]==224)
+				assert(batch_data_ten_crop[i].shape[-3]==224)
+				temp = forward_batch(batch_data_ten_crop[i])
+				full_features[i].append(temp)
 
 		elif(sample_mode == 'center_crop'):
 			batch_data = batch_data[:,:,16:240,58:282,:]
