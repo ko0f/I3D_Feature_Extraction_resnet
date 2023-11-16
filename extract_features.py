@@ -6,13 +6,17 @@ import torch
 from natsort import natsorted
 from PIL import Image
 from torch.autograd import Variable
+from tqdm import tqdm
 
 
 def load_frame(frame_file):
+	''' loads a frame and normalizes RGB values '''
 	data = Image.open(frame_file)
+	# sample down frame to 340x256 resolution
 	data = data.resize((340, 256), Image.LANCZOS)
 	data = np.array(data)
 	data = data.astype(float)
+	# rescale RGB values from 0 to 255 info -1 to 1
 	data = (data * 2 / 255) - 1
 	assert(data.max()<=1.0)
 	assert(data.min()>=-1.0)
@@ -20,14 +24,16 @@ def load_frame(frame_file):
 
 
 def load_rgb_batch(frames_dir, rgb_files, frame_indices):
+	''' fills a batch with frame data, RGB values normalized into -1 to 1 '''
 	batch_data = np.zeros(frame_indices.shape + (256,340,3))
-	for i in range(frame_indices.shape[0]):
-		for j in range(frame_indices.shape[1]):
+	for i in range(frame_indices.shape[0]): # batch_size (20)
+		for j in range(frame_indices.shape[1]): # chunk_size (16)
 			batch_data[i,j,:,:,:] = load_frame(os.path.join(frames_dir, rgb_files[frame_indices[i][j]]))
 	return batch_data
 
 
 def oversample_data(data):
+	''' arranges a frame RGB data into 10crop format '''
 	data_flip = np.array(data[:,:,:,::-1,:])
 
 	data_1 = np.array(data[:, :, :224, :224, :])
@@ -45,31 +51,33 @@ def oversample_data(data):
 	return [data_1, data_2, data_3, data_4, data_5,
 		data_f_1, data_f_2, data_f_3, data_f_4, data_f_5]
 
+def forward_batch(i3d, b_data, use_cuda):
+	b_data = b_data.transpose([0, 4, 1, 2, 3])
+	b_data = torch.from_numpy(b_data)   # b,c,t,h,w  # 40x3x16x224x224
+	with torch.no_grad():
+		if use_cuda:
+			b_data = b_data.cuda()
+		b_data = Variable(b_data).float()
+		inp = {'frames': b_data}
+		features = i3d(inp)
+	return features.cpu().numpy()
 
-def run(i3d, frequency, frames_dir, batch_size, sample_mode, use_cuda):
+
+def run(i3d, chunk_size, frames_dir, batch_size, sample_mode, use_cuda):
+	''' extracts feature set from given dir with frames JPGs of one video '''
+	
 	assert(sample_mode in ['oversample', 'center_crop'])
 	print("batchsize", batch_size)
-	chunk_size = 16
-	def forward_batch(b_data):
-		b_data = b_data.transpose([0, 4, 1, 2, 3])
-		b_data = torch.from_numpy(b_data)   # b,c,t,h,w  # 40x3x16x224x224
-		with torch.no_grad():
-			if use_cuda:
-				b_data = b_data.cuda()
-			b_data = Variable(b_data).float()
-			inp = {'frames': b_data}
-			features = i3d(inp)
-		return features.cpu().numpy()
 
 	rgb_files = natsorted([i for i in os.listdir(frames_dir)])
 	frame_cnt = len(rgb_files)
 	# Cut frames
 	assert(frame_cnt > chunk_size)
 	clipped_length = frame_cnt - chunk_size
-	clipped_length = (clipped_length // frequency) * frequency  # The start of last chunk
+	clipped_length = (clipped_length // chunk_size) * chunk_size  # The start of last chunk
 	frame_indices = [] # Frames to chunks
-	for i in range(clipped_length // frequency + 1):
-		frame_indices.append([j for j in range(i * frequency, i * frequency + chunk_size)])
+	for i in range(clipped_length // chunk_size + 1):
+		frame_indices.append([j for j in range(i * chunk_size, i * chunk_size + chunk_size)])
 	frame_indices = np.array(frame_indices)
 	chunk_num = frame_indices.shape[0]
 	batch_num = int(np.ceil(chunk_num / batch_size))    # Chunks to batches
@@ -81,21 +89,21 @@ def run(i3d, frequency, frames_dir, batch_size, sample_mode, use_cuda):
 		full_features = [[]]
 
 
-	for batch_id in range(batch_num): 
+	for batch_id in tqdm(range(batch_num)): 
 		batch_data = load_rgb_batch(frames_dir, rgb_files, frame_indices[batch_id])
 		if(sample_mode == 'oversample'):
 			batch_data_ten_crop = oversample_data(batch_data)
 			for i in range(10):
 				assert(batch_data_ten_crop[i].shape[-2]==224)
 				assert(batch_data_ten_crop[i].shape[-3]==224)
-				temp = forward_batch(batch_data_ten_crop[i])
+				temp = forward_batch(i3d, batch_data_ten_crop[i], use_cuda)
 				full_features[i].append(temp)
 
 		elif(sample_mode == 'center_crop'):
 			batch_data = batch_data[:,:,16:240,58:282,:]
 			assert(batch_data.shape[-2]==224)
 			assert(batch_data.shape[-3]==224)
-			temp = forward_batch(batch_data)
+			temp = forward_batch(i3d, batch_data, use_cuda)
 			full_features[0].append(temp)
 	
 	full_features = [np.concatenate(i, axis=0) for i in full_features]
