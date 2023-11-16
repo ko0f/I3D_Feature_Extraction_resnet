@@ -16,14 +16,15 @@ from resnet import i3_res50
 import os
 
 
-def generate(datasetpath, outputpath, pretrainedpath, frequency, batch_size, sample_mode):
+def generate(datasetpath, outputpath, pretrainedpath, frequency, batch_size, sample_mode, use_cuda, vid_ext):
 	Path(outputpath).mkdir(parents=True, exist_ok=True)
 	temppath = outputpath+ "/temp/"
 	rootdir = Path(datasetpath)
-	videos = [str(f) for f in rootdir.glob('**/*.mp4')]
+	videos = [str(f) for f in rootdir.glob('**/*.' + vid_ext)]
 	# setup the model
 	i3d = i3_res50(400, pretrainedpath)
-	i3d.cuda()
+	if use_cuda:
+		i3d.cuda()
 	i3d.train(False)  # Set model to evaluate mode
 	for video in videos:
 		videoname = video.split("/")[-1].split(".")[0]
@@ -32,7 +33,7 @@ def generate(datasetpath, outputpath, pretrainedpath, frequency, batch_size, sam
 		Path(temppath).mkdir(parents=True, exist_ok=True)
 		ffmpeg.input(video).output('{}%d.jpg'.format(temppath),start_number=0).global_args('-loglevel', 'quiet').run()
 		print("Preprocessing done..")
-		features = run(i3d, frequency, temppath, batch_size, sample_mode)
+		features = run(i3d, frequency, temppath, batch_size, sample_mode, use_cuda)
 		np.save(outputpath + "/" + videoname, features)
 		print("Obtained features of size: ", features.shape)
 		shutil.rmtree(temppath)
@@ -46,5 +47,7 @@ if __name__ == '__main__':
 	parser.add_argument('--frequency', type=int, default=16)
 	parser.add_argument('--batch_size', type=int, default=20)
 	parser.add_argument('--sample_mode', type=str, default="oversample")
+	parser.add_argument('--ext', type=str, default="mkv")
+	parser.add_argument('--cuda', action='store_true')
 	args = parser.parse_args()
-	generate(args.datasetpath, str(args.outputpath), args.pretrainedpath, args.frequency, args.batch_size, args.sample_mode)    
+	generate(args.datasetpath, str(args.outputpath), args.pretrainedpath, args.frequency, args.batch_size, args.sample_mode, args.cuda, args.ext)    

@@ -10,7 +10,7 @@ from torch.autograd import Variable
 
 def load_frame(frame_file):
 	data = Image.open(frame_file)
-	data = data.resize((340, 256), Image.ANTIALIAS)
+	data = data.resize((340, 256), Image.LANCZOS)
 	data = np.array(data)
 	data = data.astype(float)
 	data = (data * 2 / 255) - 1
@@ -46,7 +46,7 @@ def oversample_data(data):
 		data_f_1, data_f_2, data_f_3, data_f_4, data_f_5]
 
 
-def run(i3d, frequency, frames_dir, batch_size, sample_mode):
+def run(i3d, frequency, frames_dir, batch_size, sample_mode, use_cuda):
 	assert(sample_mode in ['oversample', 'center_crop'])
 	print("batchsize", batch_size)
 	chunk_size = 16
@@ -54,7 +54,9 @@ def run(i3d, frequency, frames_dir, batch_size, sample_mode):
 		b_data = b_data.transpose([0, 4, 1, 2, 3])
 		b_data = torch.from_numpy(b_data)   # b,c,t,h,w  # 40x3x16x224x224
 		with torch.no_grad():
-			b_data = Variable(b_data.cuda()).float()
+			if use_cuda:
+				b_data = b_data.cuda()
+			b_data = Variable(b_data).float()
 			inp = {'frames': b_data}
 			features = i3d(inp)
 		return features.cpu().numpy()
