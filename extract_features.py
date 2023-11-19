@@ -28,7 +28,8 @@ def load_rgb_batch(frames_dir, rgb_files, frame_indices):
 	batch_data = np.zeros(frame_indices.shape + (256,340,3))
 	for i in range(frame_indices.shape[0]): # batch_size (20)
 		for j in range(frame_indices.shape[1]): # chunk_size (16)
-			batch_data[i,j,:,:,:] = load_frame(os.path.join(frames_dir, rgb_files[frame_indices[i][j]]))
+			frame_fn = os.path.join(frames_dir, rgb_files[frame_indices[i][j]])
+			batch_data[i,j,:,:,:] = load_frame(frame_fn)
 	return batch_data
 
 
@@ -69,6 +70,7 @@ def run(i3d, chunk_size, frames_dir, batch_size, sample_mode, use_cuda):
 	assert(sample_mode in ['oversample', 'center_crop'])
 	print("batchsize", batch_size)
 
+
 	rgb_files = natsorted([i for i in os.listdir(frames_dir)])
 	frame_cnt = len(rgb_files)
 	# Cut frames
@@ -88,7 +90,7 @@ def run(i3d, chunk_size, frames_dir, batch_size, sample_mode, use_cuda):
 	else:
 		full_features = [[]]
 
-
+	print('Processing frames through I3D+10crop in batches...')
 	for batch_id in tqdm(range(batch_num)): 
 		batch_data = load_rgb_batch(frames_dir, rgb_files, frame_indices[batch_id])
 		if(sample_mode == 'oversample'):
