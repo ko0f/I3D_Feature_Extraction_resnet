@@ -23,7 +23,7 @@ def generate(datasetpath, outputpath, pretrainedpath, frequency, batch_size, sam
 	for video in tqdm(videos):
 		videoname = video.split("/")[-1].split(".")[0]
 		features_output_fn = outputpath + "/" + videoname
-		if not overwrite and os.path.isfile(features_output_fn):
+		if not overwrite and os.path.isfile(features_output_fn + '.npy'):
 			continue # skip extracted features
 		startime = time.time()
 		print("Generating JPG files for each frame of {0}...".format(video))
