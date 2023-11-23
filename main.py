@@ -29,7 +29,12 @@ def generate(datasetpath, outputpath, pretrainedpath, frequency, batch_size, sam
 		startime = time.time()
 		print("Generating JPG files for each frame of {0}...".format(video))
 		Path(temppath).mkdir(parents=True, exist_ok=True)
-		ffmpeg.input(video).output('{}%d.jpg'.format(temppath),start_number=0).global_args('-loglevel', 'quiet').run()
+		ffmpeg \
+			.input(video) \
+			.filter('fps', fps=16, round='up') \
+			.output('{}%d.jpg'.format(temppath),start_number=0) \
+			.global_args('-loglevel', 'quiet') \
+			.run()
 		print("Extracting features from frames...")
 		features = run(i3d, frequency, temppath, batch_size, sample_mode, use_cuda)
 		np.save(features_output_fn, features)
