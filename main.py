@@ -12,7 +12,8 @@ import os.path
 def generate(datasetpath, outputpath, pretrainedpath, frequency, batch_size, sample_mode, use_cuda, vid_ext, overwrite):
 	Path(outputpath).mkdir(parents=True, exist_ok=True)
 	temppath = outputpath + "/temp/"
-	shutil.rmtree(temppath) # make sure temp dir is empty, can be leftovers
+	if os.path.isdir(temppath):
+		shutil.rmtree(temppath) # make sure temp dir is empty, can be leftovers
 	rootdir = Path(datasetpath)
 	videos = [str(f) for f in rootdir.glob('**/*.' + vid_ext)]
 	# setup the model
