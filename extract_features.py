@@ -68,22 +68,23 @@ def run(i3d, chunk_size, frames_dir, batch_size, sample_mode, use_cuda):
 	''' extracts feature set from given dir with frames JPGs of one video '''
 	
 	assert(sample_mode in ['oversample', 'center_crop'])
-	print("batchsize", batch_size)
-
-
 	rgb_files = natsorted([i for i in os.listdir(frames_dir)])
 	frame_cnt = len(rgb_files)
 	# Cut frames
 	assert(frame_cnt > chunk_size)
 	clipped_length = frame_cnt - chunk_size
 	clipped_length = (clipped_length // chunk_size) * chunk_size  # The start of last chunk
-	frame_indices = [] # Frames to chunks
+	frame_indices = [] 
+	# frame_indices (chunk_num, chunk_size): list of 16 frame indices 
+	# (300, 16) for 5 min footage
 	for i in range(clipped_length // chunk_size + 1):
 		frame_indices.append([j for j in range(i * chunk_size, i * chunk_size + chunk_size)])
 	frame_indices = np.array(frame_indices)
 	chunk_num = frame_indices.shape[0]
 	batch_num = int(np.ceil(chunk_num / batch_size))    # Chunks to batches
+	# we'll send batch_size number of chunks to the model each time
 	frame_indices = np.array_split(frame_indices, batch_num, axis=0)
+	# frame_indices shape (batch_num, batch_size, chunk_size) = (15, 20, 16) for 5 min footage
 	
 	if sample_mode == 'oversample':
 		full_features = [[] for i in range(10)]
@@ -92,7 +93,7 @@ def run(i3d, chunk_size, frames_dir, batch_size, sample_mode, use_cuda):
 
 	print('Processing frames through I3D+10crop in batches...')
 	for batch_id in tqdm(range(batch_num)): 
-		batch_data = load_rgb_batch(frames_dir, rgb_files, frame_indices[batch_id])
+		batch_data = load_rgb_batch(frames_dir, rgb_files, frame_indices[batch_id]) # load batch frames
 		if(sample_mode == 'oversample'):
 			batch_data_ten_crop = oversample_data(batch_data)
 			for i in range(10):

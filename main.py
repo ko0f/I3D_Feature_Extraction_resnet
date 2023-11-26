@@ -9,6 +9,13 @@ from resnet import i3_res50
 from tqdm import tqdm
 import os.path
 
+'''
+Extract features from video files.
+
+Will convert each video to 16 (frequency) fps, then 10crop and run through I3D model to 
+extract features. These will be saved to a npy file.
+'''
+
 def generate(datasetpath, outputpath, pretrainedpath, frequency, batch_size, sample_mode, use_cuda, vid_ext, overwrite):
 	Path(outputpath).mkdir(parents=True, exist_ok=True)
 	temppath = outputpath + "/temp/"
@@ -31,14 +38,14 @@ def generate(datasetpath, outputpath, pretrainedpath, frequency, batch_size, sam
 		Path(temppath).mkdir(parents=True, exist_ok=True)
 		ffmpeg \
 			.input(video) \
-			.filter('fps', fps=16, round='up') \
+			.filter('fps', fps=frequency, round='up') \
 			.output('{}%d.jpg'.format(temppath),start_number=0) \
 			.global_args('-loglevel', 'quiet') \
 			.run()
 		print("Extracting features from frames...")
 		features = run(i3d, frequency, temppath, batch_size, sample_mode, use_cuda)
 		np.save(features_output_fn, features)
-		print("Obtained features of shape", features.shape, "processing time {0} seconds".format(time.time() - startime))
+		print("Obtained features of shape", features.shape, "processing time {0} seconds".format(time.time() - startime), "\n")
 		shutil.rmtree(temppath)
 
 if __name__ == '__main__': 
